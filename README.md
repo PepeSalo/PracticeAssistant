@@ -1,6 +1,6 @@
 # Language Practice Assistant
 
-**Version: 1.3**
+**Version: 1.4**
 
 A speech-first Python application for practising languages with a conversational tutor.
 Speak naturally, receive short spoken replies, request gentle corrections and steer
@@ -209,11 +209,23 @@ account, a pre-installed Python, or administrator rights.
 Build the folder on the development PC while it still has internet:
 
 ```powershell
+# Self-contained: the stick carries Python and every package (~48 MB)
+powershell -ExecutionPolicy Bypass -File scripts\build_usb_bundle.ps1 -Offline
+
+# Small: Python and the packages are downloaded during installation (~0.2 MB)
 powershell -ExecutionPolicy Bypass -File scripts\build_usb_bundle.ps1
 ```
 
-That creates `dist\PracticeAssistant-<version>-usb\` (about 0.2 MB). Copy the whole
-folder to the USB stick, then to the target PC.
+`-Offline` needs a cache built once on a networked machine:
+
+```powershell
+pip download -r requirements.txt --only-binary=:all: --platform win_amd64 `
+    --python-version 3.14 --implementation cp --dest dist\_cache\wheels
+# plus the official python-3.14.3-amd64.exe in dist\_cache\
+```
+
+That creates `dist\PracticeAssistant-<version>-usb\`. Copy the whole folder to the USB
+stick, then to the target PC.
 
 On the target PC:
 
@@ -459,6 +471,7 @@ These are development attributions, not runtime model dependencies.
 | 1.1 | 2026-10-13 | Local web chat window with notifications, per-turn timings, settings chips, quick controls and typed turns; USB installer (`Install.cmd`), `INSTALL.txt`, bundle build script and installer tests. |
 | 1.2 | 2026-10-13 | Optional automatic version updates from a GitHub repository (`install/update.ps1`, `Update Practice Assistant.cmd`, update check at startup), configurable repository URL, and documentation of the OpenRouter limitation. |
 | 1.3 | 2026-10-13 | Read-only GitHub token support for private repositories: optional one-time sign-in through Git Credential Manager, `PA_GITHUB_TOKEN` for automated setups, with the token never written to `update.ini`, `.git/config` or logs. OpenAI confirmed as the only provider. |
+| 1.4 | 2026-10-13 | Self-contained offline installation bundle (bundled Python installer and wheels, `-Offline`), with a network fallback; pip upgrade made best-effort so an install without internet cannot fail. Project moved to its own folder with a standard `.venv`. |
 
 Start numbering at 1.0 and increase by exactly 0.1 for every subsequent completed
 code, configuration or documentation change set. Update this version, add a history

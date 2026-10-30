@@ -299,3 +299,45 @@ def test_openai_remains_the_only_provider():
         text = path.read_text(encoding="utf-8", errors="ignore").casefold()
         assert "openrouter" not in text, f"OpenRouter reference in {path}"
     assert "openai" in (ROOT / "requirements.txt").read_text(encoding="utf-8")
+
+
+def test_installer_prefers_the_bundled_python_installer():
+    text = read(INSTALL)
+    assert "install\\python" in text
+    assert "bundled installer" in text.lower()
+    # A download is only the fallback.
+    download_at = text.index("Downloading $url")
+    bundled_at = text.index("install\\python")
+    assert bundled_at < download_at
+
+
+def test_installer_prefers_the_bundled_wheels():
+    text = read(INSTALL)
+    assert "install\\wheels" in text
+    assert "--no-index" in text
+    assert "--find-links" in text
+    # pyproject must still be the fallback path.
+    fallback_at = text.index("Downloading the packages from the internet")
+    assert text.index("--no-index") < fallback_at
+
+
+def test_pip_upgrade_cannot_break_an_offline_install():
+    text = read(INSTALL)
+    upgrade = text.index("--upgrade', 'pip'")
+    surrounding = text[max(0, upgrade - 400) : upgrade]
+    assert "try {" in surrounding
+    assert "Could not refresh pip" in text
+
+
+def test_offline_bundle_flag_bundles_python_and_wheels():
+    text = read(BUILD)
+    assert "[switch]$Offline" in text
+    assert "install\\python" in text
+    assert "install\\wheels" in text
+    assert "python-3.14.3-amd64.exe" in text
+
+
+def test_build_script_refuses_offline_without_a_cache():
+    text = read(BUILD)
+    assert "Bundled Python installer not found" in text
+    assert "Wheel cache not found" in text

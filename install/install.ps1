@@ -132,27 +132,39 @@ try {
     if ($systemPython) {
         Write-Ok "Using Python $($version) at $systemPython"
     } else {
-        Write-Note 'No suitable Python was found; downloading the official installer.'
-        if ($Quiet) {
-            Fail 'Python 3.10+ is required and silent download is disabled.' `
-                'Run Install.cmd again without -Quiet.'
-        }
-        $installer = Join-Path $env:TEMP 'practice-assistant-python.exe'
-        $url = 'https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe'
-        Write-Note "Downloading $url"
-        try {
-            Invoke-WebRequest -Uri $url -OutFile $installer -UseBasicParsing
-        } catch {
-            Fail 'Python could not be downloaded. Check the internet connection.' `
-                "Install Python 3.10 or newer from python.org and run Install.cmd again.`n$($_.Exception.Message)"
+        # Prefer the Python installer shipped on the stick, so a clean PC
+        # needs no download at all.
+        $installer = Get-ChildItem -Path (Join-Path $Script:Root 'install\python') `
+            -Filter '*.exe' -File -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending | Select-Object -First 1
+
+        if ($installer) {
+            Write-Note "Using the bundled installer: $($installer.Name)"
+            $installer = $installer.FullName
+        } else {
+            Write-Note 'No suitable Python was found; downloading the official installer.'
+            if ($Quiet) {
+                Fail 'Python 3.10+ is required and silent download is disabled.' `
+                    'Run Install.cmd again without -Quiet.'
+            }
+            $installer = Join-Path $env:TEMP 'practice-assistant-python.exe'
+            $url = 'https://www.python.org/ftp/python/3.14.3/python-3.14.3-amd64.exe'
+            Write-Note "Downloading $url"
+            try {
+                Invoke-WebRequest -Uri $url -OutFile $installer -UseBasicParsing
+            } catch {
+                Fail 'Python could not be downloaded. Check the internet connection.' `
+                    "Install Python 3.10 or newer from python.org and run Install.cmd again.`n$($_.Exception.Message)"
+            }
         }
         Write-Note 'Installing Python for the current user (this takes a minute).'
         & $installer /quiet InstallAllUsers=0 PrependPath=1 Include_launcher=1 `
             Include_test=0 Include_doc=0 Include_tcltk=1 | Out-Null
         Start-Sleep -Seconds 3
         foreach ($candidate in @(
-            (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe'),
-            (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python313\python.exe'))) {
+            (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python314\python.exe'),
+            (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python313\python.exe'),
+            (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe'))) {
             if (Test-Path $candidate) { $systemPython = $candidate; break }
         }
         if (-not $systemPython) {
@@ -181,16 +193,45 @@ try {
     Write-Step 'Installing the required packages (needs internet)'
 
     $requirements = Join-Path $Script:AppSource 'requirements.txt'
-    Invoke-Logged $Script:PythonExe @(
-        '-m', 'pip', 'install', '--disable-pip-version-check',
-        '--upgrade', 'pip', '--quiet') | Out-Null
+    $wheelhouse = Join-Path $Script:Root 'install\wheels'
+    $haveWheels = (Test-Path $wheelhouse) -and
+        ((Get-ChildItem $wheelhouse -Filter '*.whl' -File -ErrorAction SilentlyContinue |
+            Measure-Object).Count -gt 0)
+
+    # Upgrading pip needs the network. It is only a nicety, so a PC with no
+    # internet must not fail here; the bundled pip installs the wheels fine.
     try {
         Invoke-Logged $Script:PythonExe @(
             '-m', 'pip', 'install', '--disable-pip-version-check',
-            '-r', $requirements, '--quiet') | Out-Null
+            '--upgrade', 'pip', '--quiet') | Out-Null
     } catch {
-        Fail 'The packages could not be installed.' `
-            "Check the internet connection and try again.`n$($_.Exception.Message)"
+        Write-Note 'Could not refresh pip; continuing with the installed version.'
+    }
+
+    $installed = $false
+    if ($haveWheels) {
+        Write-Note 'Installing the bundled packages (no download needed).'
+        try {
+            Invoke-Logged $Script:PythonExe @(
+                '-m', 'pip', 'install', '--disable-pip-version-check',
+                '--no-index', '--find-links', $wheelhouse,
+                '-r', $requirements, '--quiet') | Out-Null
+            $installed = $true
+        } catch {
+            Write-Note 'The bundled packages did not fit this PC; using the internet instead.'
+        }
+    }
+
+    if (-not $installed) {
+        Write-Note 'Downloading the packages from the internet.'
+        try {
+            Invoke-Logged $Script:PythonExe @(
+                '-m', 'pip', 'install', '--disable-pip-version-check',
+                '-r', $requirements, '--quiet') | Out-Null
+        } catch {
+            Fail 'The packages could not be installed.' `
+                "Check the internet connection and try again.`n$($_.Exception.Message)"
+        }
     }
     Write-Ok 'Packages installed'
 

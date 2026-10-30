@@ -9,7 +9,8 @@ WHAT YOU NEED
 -------------
 - A Windows 10 or 11 PC (64-bit).
 - A microphone and speakers or headphones. Headphones are strongly recommended.
-- Internet access. It is used to install the program and for the AI service.
+- Internet access, for the AI service. The installation itself needs no internet
+  when the stick was built with the bundled Python and packages (about 48 MB).
 - An API key for the AI service (OpenAI or OpenRouter - see the note at the end).
 
 You do NOT need administrator rights, a GitHub account, or Python installed
