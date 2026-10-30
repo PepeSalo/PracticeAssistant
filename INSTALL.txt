@@ -1,0 +1,160 @@
+Practice Assistant - installation instructions
+=============================================
+
+A speech-based language practice assistant for Windows 10 and 11 (64-bit).
+You talk, it answers aloud, and a browser chat window shows what was said.
+
+
+WHAT YOU NEED
+-------------
+- A Windows 10 or 11 PC (64-bit).
+- A microphone and speakers or headphones. Headphones are strongly recommended.
+- Internet access. It is used to install the program and for the AI service.
+- An API key for the AI service (OpenAI or OpenRouter - see the note at the end).
+
+You do NOT need administrator rights, a GitHub account, or Python installed
+beforehand.
+
+
+HOW TO INSTALL (about 3 minutes)
+--------------------------------
+1. Copy the whole "PracticeAssistant" folder from the USB stick to the PC.
+   Copy the folder itself, not just one file inside it. The Desktop is fine.
+
+2. Open the copied folder and double-click:
+
+       Install.cmd
+
+3. If Windows shows "Windows protected your PC", click "More info" and then
+   "Run anyway". This appears because the file came from a USB stick.
+
+4. Follow the on-screen messages. The installer:
+     - checks that the PC can run the assistant,
+     - downloads and installs Python for the current user if it is missing,
+     - creates a private environment and installs the required packages,
+     - creates a "Practice Assistant" shortcut on the Desktop and Start Menu,
+     - asks once for your API key (you may press Enter to skip it).
+
+5. Start the assistant from the Desktop shortcut "Practice Assistant".
+
+6. A browser window opens with the chat window. Stay quiet for about one second
+   so the microphone level can be calibrated, then try:
+
+       "Hello, I would like to practise ordering coffee."
+
+
+IF SOMETHING GOES WRONG
+-----------------------
+- The installer prints a short explanation and writes details to:
+      %TEMP%\practice-assistant-install.log
+  Send that file when asking for help. It never contains your API key.
+
+- "The application files are missing": you copied only Install.cmd. Copy the
+  whole PracticeAssistant folder.
+
+- "The packages could not be installed": check the internet connection, then
+  run Install.cmd again. Re-running is safe and upgrades the installation.
+
+- "The API key is not set yet": run "Set API key.cmd" from the installation
+  folder, or from the Start Menu folder, and paste the key.
+
+- No sound or the assistant answers itself: use headphones. On a laptop with
+  built-in speakers, add this in the launcher properties:
+
+       --echo-guard half-duplex
+
+  This stops the microphone from hearing the speakers. It also disables
+  interrupting the assistant by speaking.
+
+- Antivirus blocks the script: right-click Install.cmd, choose Properties, and
+  tick "Unblock". The installer also tries to do this for you.
+
+
+WHERE THINGS ARE INSTALLED
+--------------------------
+The program itself is installed for your Windows user in:
+
+    %LOCALAPPDATA%\PracticeAssistant
+
+Nothing is installed system-wide and no administrator rights are used.
+Your API key is stored for your Windows user account only.
+
+To remove everything: delete the folder above and the
+"Practice Assistant" shortcuts from the Desktop and Start Menu.
+
+
+USING IT
+--------
+- Speak naturally. The assistant replies in short sentences.
+- Start speaking while it is talking to interrupt it.
+- The chat window shows what was heard, the reply, corrections, how fast each
+  answer came, and the current settings.
+- You can change language, level and scenario with your voice ("let's practise
+  Spanish", "level B2", "role-play ordering at a cafe"), with the buttons in
+  the window, or by typing in the text box.
+- Say "end session" for a short summary, or press Ctrl+C in the black console
+  window to stop.
+
+
+ABOUT THE API KEY AND PROVIDER
+------------------------------
+This version talks to the OpenAI API and reads the key from the OPENAI_API_KEY
+environment variable. It needs speech-to-text, text-to-speech and a chat model.
+
+An OpenRouter key is NOT enough to run this program. OpenRouter does not offer
+speech-to-text, text-to-speech or real-time speech-to-speech endpoints, so an
+OpenRouter-only key cannot make the assistant listen or speak. Do not paste an
+OpenRouter key into "Set API key.cmd" expecting it to work.
+
+No key is stored in these files. Never send your key to anyone.
+
+
+AUTOMATIC UPDATES FROM GITHUB (optional)
+----------------------------------------
+If this PC can read the project's GitHub repository, the assistant can check for
+a newer version every time it starts.
+
+- During installation you may be asked for the repository URL. Press Enter to
+  skip; nothing then contacts GitHub.
+- The repository URL and the on/off switch are stored in:
+      %LOCALAPPDATA%\PracticeAssistant\update.ini
+  Delete that file to stop checking for updates.
+- Updates need Git (git-scm.com). If Git is missing, the installer offers to
+  install it. Without Git the program simply skips the check.
+- To update on demand, run "Update Practice Assistant.cmd" in the installation
+  folder (it is also in the Start Menu folder).
+- To skip the check once, set PA_NO_UPDATE=1 before starting.
+
+How the check behaves:
+- It only fast-forwards (git pull --ff-only). Your installation is never
+  force-overwritten and diverged history is reported, not merged.
+- If the local copy has manual changes, the update is skipped.
+- If GitHub is unreachable, offline, or the repository is private and not
+  authenticated, you get a short warning and the installed version keeps
+  working.
+- A private repository is authenticated by Git itself (Git Credential Manager),
+  which keeps the credential encrypted by Windows.
+
+  Create a read-only "fine-grained" token on GitHub:
+      GitHub -> Settings -> Developer settings -> Personal access tokens
+             -> Fine-grained tokens -> Generate new token
+      Repository access: only this repository
+      Permissions: Contents -> Read-only
+      (nothing else is needed; no write access is ever requested)
+
+  Use it once from "Update Practice Assistant.cmd" (Git asks for the
+  username and the token as the password) and Windows stores it.
+
+  Advanced: you may instead set PA_GITHUB_TOKEN in the environment before
+  running the updater. It is used in memory only and never written to disk.
+  Do not put it in update.ini; that file only holds the repository URL.
+
+Security note: never give a program your GitHub account password. A read-only
+token is enough, and only if the repository is private.
+
+
+PRIVACY
+-------
+Audio is processed in memory and sent to the AI service; it is not saved on
+this PC. Conversation text is not written to disk unless you explicitly enable
+logging. The chat window only accepts connections from this PC.

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="session-token" content="__SESSION_TOKEN__">
+<title>Language Practice Assistant</title>
+<link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+<a class="skip" href="#conversation">Skip to conversation</a>
+
+<header class="bar">
+  <div class="bar-main">
+    <h1>Language Practice</h1>
+    <p class="status" id="status" role="status" aria-live="polite">
+      <span class="dot" id="status-dot" aria-hidden="true"></span>
+      <span id="status-text">Starting…</span>
+    </p>
+  </div>
+  <div class="chips" id="chips" aria-label="Session settings">
+    <button class="chip" data-chip="practice_language" type="button">
+      Practice: <b id="chip-practice_language">…</b>
+    </button>
+    <button class="chip" data-chip="level" type="button">
+      Level: <b id="chip-level">…</b>
+    </button>
+    <button class="chip" data-chip="scenario" type="button">
+      Scenario: <b id="chip-scenario">…</b>
+    </button>
+    <button class="chip" data-chip="correction" type="button">
+      Corrections: <b id="chip-correction">…</b>
+    </button>
+    <span class="chip static">Engine: <b id="chip-engine">…</b></span>
+  </div>
+  <div class="chip-menu" id="chip-menu" hidden></div>
+</header>
+
+<main>
+  <section class="conversation" id="conversation" aria-live="polite" aria-label="Conversation">
+    <p class="empty" id="empty">
+      The assistant is starting. Stay quiet for a second so it can calibrate your
+      microphone, then say something such as “Hello, I would like to practise ordering
+      coffee.”
+    </p>
+  </section>
+
+  <section class="controls" aria-label="Quick controls">
+    <button type="button" data-action="stop" class="primary">Stop speaking</button>
+    <button type="button" data-action="repeat">Repeat</button>
+    <button type="button" data-action="speed" data-value="slower">Slower</button>
+    <button type="button" data-action="speed" data-value="faster">Faster</button>
+    <button type="button" data-action="correction" id="toggle-correction">Corrections</button>
+    <button type="button" data-action="end" class="danger">End session</button>
+  </section>
+
+  <form class="typebox" id="typebox" autocomplete="off">
+    <label class="visually-hidden" for="typed">Type a message instead of speaking</label>
+    <input id="typed" name="typed" type="text" maxlength="2000"
+           placeholder="Type instead of speaking…" disabled>
+    <button type="submit" id="send" disabled>Send</button>
+    <p class="hint" id="type-hint">Waiting for the assistant to start.</p>
+  </form>
+
+  <details class="panel" id="session-panel">
+    <summary>This session</summary>
+    <div class="panel-body">
+      <h3>Vocabulary practised</h3>
+      <ul id="vocabulary"><li class="muted">Nothing recorded yet.</li></ul>
+      <h3>Recurring corrections</h3>
+      <ul id="mistakes"><li class="muted">Nothing recorded yet.</li></ul>
+      <p class="note">
+        These notes are written by the tutor model during the conversation. They can be
+        incomplete or mistaken and are not a language assessment or a pronunciation score.
+      </p>
+    </div>
+  </details>
+
+  <details class="panel">
+    <summary>What you can say</summary>
+    <div class="panel-body">
+      <table>
+        <thead><tr><th>Say</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>“stop”, “wait”, “hold on”</td><td>Interrupt and keep listening</td></tr>
+          <tr><td>“repeat that”, “say it again”</td><td>Repeat the last answer</td></tr>
+          <tr><td>“speak slower”, “speak faster”</td><td>Change speaking rate</td></tr>
+          <tr><td>“make it easier”, “level B2”</td><td>Change level</td></tr>
+          <tr><td>“let’s practise Spanish”</td><td>Change practice language</td></tr>
+          <tr><td>“role-play ordering at a cafe”</td><td>Change scenario</td></tr>
+          <tr><td>“correct my mistakes”, “don’t correct me”</td><td>Corrections on or off</td></tr>
+          <tr><td>“how do you say …?”</td><td>Ask for a mini-lesson</td></tr>
+          <tr><td>“end session”, “goodbye”</td><td>Summary and clean exit</td></tr>
+        </tbody>
+      </table>
+      <p class="note">
+        Direct commands also work in Finnish. Quoted phrases such as “the bus stop” are
+        treated as conversation, not as controls.
+      </p>
+    </div>
+  </details>
+
+  <details class="panel" id="notifications-panel">
+    <summary>Recent notifications</summary>
+    <div class="panel-body">
+      <ol id="notifications" class="feed">
+        <li class="muted">No notifications yet.</li>
+      </ol>
+      <p class="note">
+        Session changes, warnings and errors appear here and as short pop-ups. They are
+        kept for this session only and are not written to disk unless you enabled
+        logging.
+      </p>
+    </div>
+  </details>
+
+  <details class="panel" id="diagnostics-panel">
+    <summary>Diagnostics</summary>
+    <div class="panel-body">
+      <dl id="diagnostics"></dl>
+      <p class="note" id="dropped-note" hidden>
+        Slow connection: some older notifications were skipped.
+      </p>
+    </div>
+  </details>
+</main>
+
+<aside class="toasts" id="toasts" aria-live="polite" aria-label="Notifications"></aside>
+
+<script src="/assets/app.js"></script>
+</body>
+</html>
