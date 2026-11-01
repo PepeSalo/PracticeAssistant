@@ -70,6 +70,27 @@ IF SOMETHING GOES WRONG
 - Antivirus blocks the script: right-click Install.cmd, choose Properties, and
   tick "Unblock". The installer also tries to do this for you.
 
+- The assistant seems stuck and nothing happens:
+  a watchdog now protects the session. After about 8 seconds without progress it
+  prints "Still waiting for the assistant...", and after 25 seconds it cancels
+  the stuck turn and tells you to speak again. The program no longer freezes.
+  If it repeats, check the network and try again.
+
+- Looking for the reason afterwards:
+  every session writes a log (timestamps and events, never your speech) to
+      %LOCALAPPDATA%\PracticeAssistant\logs\session-YYYYMMDD-HHMMSS\events.jsonl
+  The path is printed when the assistant starts. Spoken text is only included
+  if you start it with --log-transcripts. No log at all: --no-log.
+
+- It does not understand Finnish commands well:
+  direct commands work in English and Finnish (lopeta, seis, odota, toista,
+  puhu hitaammin, helpompaa, vaikeampaa, korjaa virheeni, ala korjaa,
+  harjoitellaan suomea, lopeta harjoitus). If recognition still struggles, use a
+  more accurate transcriber:
+      "...\python.exe" -m practice_assistant --stt-model gpt-4o-transcribe
+  The default since 1.5 is already gpt-4o-transcribe, which is better than the
+  cheaper gpt-4o-mini-transcribe for accented and non-English speech.
+
 
 WHERE THINGS ARE INSTALLED
 --------------------------
