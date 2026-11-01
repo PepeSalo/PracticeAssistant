@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="session-token" content="__SESSION_TOKEN__">
-<title>Language Practice Assistant</title>
+<title>Language Practice Assistant __APP_VERSION__</title>
 <link rel="stylesheet" href="/assets/app.css">
 </head>
 <body>
@@ -32,6 +32,7 @@
       Corrections: <b id="chip-correction">…</b>
     </button>
     <span class="chip static">Engine: <b id="chip-engine">…</b></span>
+    <span class="chip static">Version: <b id="app-version">__APP_VERSION__</b></span>
   </div>
   <div class="chip-menu" id="chip-menu" hidden></div>
 </header>
@@ -124,6 +125,21 @@
     </div>
   </details>
 </main>
+
+<footer class="about" role="contentinfo">
+  <p>
+    <strong>Language Practice Assistant</strong>
+    <span class="sep" aria-hidden="true">·</span>
+    Developed by __APP_AUTHOR__
+    <span class="sep" aria-hidden="true">·</span>
+    __APP_COPYRIGHT__
+  </p>
+  <p>
+    <a href="__APP_URL__" target="_blank" rel="noopener noreferrer">Project page and release notes</a>
+    <span class="sep" aria-hidden="true">·</span>
+    Your speech is sent to the AI service and is not saved on this PC.
+  </p>
+</footer>
 
 <aside class="toasts" id="toasts" aria-live="polite" aria-label="Notifications"></aside>
 

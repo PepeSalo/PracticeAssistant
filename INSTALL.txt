@@ -76,6 +76,10 @@ IF SOMETHING GOES WRONG
   the stuck turn and tells you to speak again. The program no longer freezes.
   If it repeats, check the network and try again.
 
+- Which version is running?
+  The web window shows it as a "Version: 1.7" chip at the top and in the page
+  title. The footer names the developer and copyright.
+
 - Looking for the reason afterwards:
   every session writes a log (timestamps and events, never your speech) to
       %LOCALAPPDATA%\PracticeAssistant\logs\session-YYYYMMDD-HHMMSS\events.jsonl

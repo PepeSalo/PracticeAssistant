@@ -4,6 +4,7 @@ import json
 import threading
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 import pytest
 
@@ -290,3 +291,64 @@ def test_body_cannot_be_read_twice(ui):
     server, _bus, _controller, url = ui
     for _ in range(3):
         assert post(f"{url}/api/command", {"action": 5}, token=server.token)[0] == 400
+
+
+# ---- visible identity: version, developer, copyright ------------------
+def test_index_shows_version_developer_and_copyright(ui):
+    from practice_assistant import __author__, __copyright__, __url__, __version__
+
+    _server, _bus, _controller, url = ui
+    text = get(f"{url}/")[2].decode("utf-8")
+    assert __version__ in text
+    assert __author__ in text
+    assert __copyright__ in text
+    assert __url__ in text
+    # No unreplaced template markers may reach the browser.
+    assert "__APP_" not in text
+    assert "__SESSION_TOKEN__" not in text
+
+
+def test_version_appears_in_the_title_and_as_a_chip(ui):
+    from practice_assistant import __version__
+
+    _server, _bus, _controller, url = ui
+    text = get(f"{url}/")[2].decode("utf-8")
+    assert f"<title>Language Practice Assistant {__version__}</title>" in text
+    assert f'id="app-version">{__version__}<' in text
+
+
+def test_state_snapshot_reports_the_application_identity(ui):
+    from practice_assistant import __author__, __version__
+
+    server, _bus, _controller, url = ui
+    payload = json.loads(get(f"{url}/api/state", token=server.token)[2])
+    assert payload["app"]["version"] == __version__
+    assert payload["app"]["author"] == __author__
+    assert payload["app"]["copyright"].startswith("©")
+    assert payload["app"]["url"].startswith("https://github.com/")
+
+
+def test_sse_snapshot_also_carries_the_identity(ui):
+    server, _bus, _controller, url = ui
+    request = urllib.request.Request(f"{url}/api/events", method="GET")
+    request.add_header("X-Session-Token", server.token)
+    with urllib.request.urlopen(request, timeout=10) as response:
+        for _ in range(40):
+            line = response.readline().decode("utf-8")
+            if line.startswith("data: "):
+                payload = json.loads(line[6:].strip())
+                if "settings" in payload:
+                    assert payload["app"]["name"] == "Language Practice Assistant"
+                    return
+    raise AssertionError("no snapshot frame received")
+
+
+def test_versions_never_disagree():
+    """The UI, the package and pyproject must agree."""
+    import tomllib
+
+    from practice_assistant import __version__
+
+    root = Path(__file__).resolve().parents[1]
+    data = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    assert data["project"]["version"] == __version__

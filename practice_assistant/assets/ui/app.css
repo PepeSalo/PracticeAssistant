@@ -362,3 +362,23 @@ dd { margin: 0; overflow-wrap: anywhere; }
   main { padding: 14px 12px 120px; }
   .bar { padding: 10px 12px; }
 }
+
+/* about / footer */
+.about {
+  max-width: 900px;
+  margin: 24px auto 0;
+  padding: 16px 20px 8px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.about p { margin: 0 0 6px; }
+.about strong { color: var(--ink); font-weight: 600; }
+.about a { color: var(--accent); }
+.about .sep { padding: 0 6px; }
+
+@media (max-width: 640px) {
+  .about { padding: 14px 12px 8px; }
+}

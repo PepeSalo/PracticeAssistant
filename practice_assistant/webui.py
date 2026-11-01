@@ -17,11 +17,14 @@ from __future__ import annotations
 import json
 import secrets
 import threading
+from html import escape
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Protocol
 from urllib.parse import parse_qs, urlsplit
+
+from . import __author__, __copyright__, __url__, __version__
 
 MAX_BODY = 8192
 ASSETS = Path(__file__).with_name("assets") / "ui"
@@ -39,6 +42,17 @@ CONTENT_SECURITY_POLICY = (
     "form-action 'none'; "
     "frame-ancestors 'none'"
 )
+
+
+def app_info() -> dict[str, str]:
+    """Identity shown in the window and included in state snapshots."""
+    return {
+        "name": "Language Practice Assistant",
+        "version": __version__,
+        "author": __author__,
+        "copyright": __copyright__,
+        "url": __url__,
+    }
 
 
 class Controller(Protocol):
@@ -162,7 +176,7 @@ class _Handler(BaseHTTPRequestHandler):
             if not self._token_ok(query):
                 self._fail(HTTPStatus.FORBIDDEN, "Missing or wrong session token.")
                 return
-            self._json(HTTPStatus.OK, self.bus.state())
+            self._json(HTTPStatus.OK, self._state_payload())
             return
         if path == "/api/events":
             if not self._token_ok(query):
@@ -211,7 +225,12 @@ class _Handler(BaseHTTPRequestHandler):
         except RuntimeError as exc:
             self._fail(HTTPStatus.CONFLICT, str(exc))
             return
-        self._json(HTTPStatus.OK, self.bus.state())
+        self._json(HTTPStatus.OK, self._state_payload())
+
+    def _state_payload(self) -> dict[str, Any]:
+        payload = dict(self.bus.state())
+        payload["app"] = app_info()
+        return payload
 
     # ---- responses -------------------------------------------------------
     def _serve_index(self) -> None:
@@ -220,7 +239,13 @@ class _Handler(BaseHTTPRequestHandler):
         except OSError:
             self._fail(HTTPStatus.INTERNAL_SERVER_ERROR, "UI files are missing.")
             return
-        document = html.replace("__SESSION_TOKEN__", self.token)
+        document = (
+            html.replace("__SESSION_TOKEN__", self.token)
+            .replace("__APP_VERSION__", escape(__version__))
+            .replace("__APP_AUTHOR__", escape(__author__))
+            .replace("__APP_COPYRIGHT__", escape(__copyright__))
+            .replace("__APP_URL__", escape(__url__, quote=True))
+        )
         body = document.encode("utf-8")
         self._send(HTTPStatus.OK, body, "text/html; charset=utf-8")
 
@@ -245,7 +270,7 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_header("Connection", "keep-alive")
             self.send_header("X-Accel-Buffering", "no")
             self.end_headers()
-            self._write_frame(self.bus.state(), event="snapshot")
+            self._write_frame(self._state_payload(), event="snapshot")
             while True:
                 events = subscriber.drain(15.0)
                 for event in events:
