@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from dataclasses import dataclass
 from typing import Literal, TypedDict
 
@@ -35,7 +36,34 @@ LANGUAGES = {
     "ruotsi": "sv",
     "japanese": "ja",
     "japani": "ja",
+    # Finnish inflected forms ("harjoitellaan suomea").
+    "suomea": "fi",
+    "suomeksi": "fi",
+    "englantia": "en",
+    "englanniksi": "en",
+    "espanjaa": "es",
+    "espanjaksi": "es",
+    "ranskaa": "fr",
+    "ranskaksi": "fr",
+    "saksaa": "de",
+    "saksaksi": "de",
+    "italiaa": "it",
+    "italiaksi": "it",
+    "ruotsia": "sv",
+    "ruotsiksi": "sv",
+    "japania": "ja",
+    "japaniksi": "ja",
 }
+
+
+def fold(text: str) -> str:
+    """Drop diacritics so "ala korjaa" still matches "älä korjaa".
+
+    Speech recognisers frequently return Finnish without ä/ö. Folding is only a
+    fallback: an exact match always wins, so meaning is never changed silently.
+    """
+    decomposed = unicodedata.normalize("NFD", text)
+    return "".join(char for char in decomposed if not unicodedata.combining(char))
 
 
 @dataclass(frozen=True)
@@ -61,24 +89,47 @@ def parse_command(text: str, *, final: bool = True) -> Command | None:
         "be quiet": ("stop", ""),
         "lopeta": ("stop", ""),
         "odota": ("stop", ""),
+        "hetkinen": ("stop", ""),
+        "seis": ("stop", ""),
+        "pysahdy": ("stop", ""),
+        "rauhoitu": ("stop", ""),
+        "ei mitaan": ("stop", ""),
         "repeat that": ("repeat", ""),
         "say it again": ("repeat", ""),
         "toista": ("repeat", ""),
         "sano uudelleen": ("repeat", ""),
+        "toista se": ("repeat", ""),
+        "sano se uudelleen": ("repeat", ""),
+        "uudelleen": ("repeat", ""),
+        "mita sanoit": ("repeat", ""),
         "speak slower": ("speed", "slower"),
         "slow down": ("speed", "slower"),
         "puhu hitaammin": ("speed", "slower"),
+        "hitaammin": ("speed", "slower"),
+        "puhu hitaasti": ("speed", "slower"),
         "speak faster": ("speed", "faster"),
         "speed up": ("speed", "faster"),
         "puhu nopeammin": ("speed", "faster"),
+        "nopeammin": ("speed", "faster"),
+        "puhu nopeasti": ("speed", "faster"),
         "make it easier": ("level", "easier"),
         "helpommin": ("level", "easier"),
+        "helpompaa": ("level", "easier"),
+        "helpompi": ("level", "easier"),
+        "yksinkertaisemmin": ("level", "easier"),
         "make it harder": ("level", "harder"),
         "vaikeammin": ("level", "harder"),
+        "vaikeampaa": ("level", "harder"),
+        "vaikeampi": ("level", "harder"),
         "correct my mistakes": ("correction", "on"),
         "korjaa virheeni": ("correction", "on"),
+        "korjaa virheet": ("correction", "on"),
+        "korjaa minua": ("correction", "on"),
         "dont correct me": ("correction", "off"),
         "älä korjaa minua": ("correction", "off"),
+        "älä korjaa": ("correction", "off"),
+        "älä korjaa virheitäni": ("correction", "off"),
+        "älä korjaa virheitä": ("correction", "off"),
         "goodbye": ("end", ""),
         "end session": ("end", ""),
         "quit": ("end", ""),
@@ -87,6 +138,14 @@ def parse_command(text: str, *, final: bool = True) -> Command | None:
     }
     if text in fixed:
         return Command(*fixed[text])
+    # Recognisers often drop ä/ö, so retry on a folded copy. Building the map
+    # from the dictionary keeps every Finnish phrase covered automatically.
+    folded_map = {fold(key): value for key, value in fixed.items()}
+    folded = fold(text)
+    if folded in fixed:
+        return Command(*fixed[folded])
+    if folded in folded_map:
+        return Command(*folded_map[folded])
     match = re.fullmatch(r"(?:level|taso) (a[12]|b[12]|c[12])", text)
     if match:
         return Command("level", match[1].upper())
@@ -95,7 +154,8 @@ def parse_command(text: str, *, final: bool = True) -> Command | None:
         text,
     )
     if match:
-        value = LANGUAGES.get(match[1], match[1])
+        name = match[1]
+        value = LANGUAGES.get(name) or LANGUAGES.get(fold(name)) or name
         try:
             return Command("language", language(value))
         except ValueError:

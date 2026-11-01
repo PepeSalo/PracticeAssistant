@@ -12,6 +12,7 @@ from .metrics import TurnTiming
 from .report import Reports
 from .resilience import AppError
 from .vad import AudioEvent, EndpointDetector
+from .watchdog import Watchdog
 
 
 class Session:
@@ -46,9 +47,16 @@ class Session:
         self.playback_timings: dict[str, TurnTiming] = {}
         self.callback_error: AppError | None = None
         self.effective_threshold: float | None = options.vad_threshold
+        self.watchdog = Watchdog(
+            self,
+            hard_seconds=getattr(options, "watchdog_seconds", 25.0),
+            soft_seconds=max(3.0, getattr(options, "watchdog_seconds", 25.0) / 3),
+        )
 
     def emit(self, kind: str, **data) -> None:
         """Publish a structured event for the web UI; a no-op without a bus."""
+        # Any emitted event is real progress; it resets the watchdog timers.
+        self.watchdog.progress()
         if self.bus is not None:
             self.bus.emit(kind, **data)
 
@@ -135,6 +143,18 @@ class Session:
             self.reports.event("echo_suspected", turn=self.turn_number)
         return suspected
 
+    async def _bounded(self, awaitable, what: str):
+        """Refuse to wait forever: a stall becomes a clear, recoverable error."""
+        try:
+            return await asyncio.wait_for(awaitable, self.options.timeout)
+        except TimeoutError as exc:
+            message = (
+                f"No response while {what} for {self.options.timeout:.0f} seconds. "
+                "The connection may have stalled; recovering."
+            )
+            self.emit("error", message=message, retryable=True)
+            raise AppError(message, retryable=True) from exc
+
     def complete_turn(self) -> None:
         if self.timing is None:
             return
@@ -168,6 +188,8 @@ class Session:
         )
         self.effective_threshold = self.options.vad_threshold
         self.audio.start()
+        self.watchdog.progress()
+        self.watchdog.start(engine)
         self.emit(
             "state",
             state="listening",
@@ -223,7 +245,7 @@ class Session:
                             at=event.at,
                             threshold=self.effective_threshold,
                         )
-                        await engine.interrupt(event.at)
+                        await self._bounded(engine.interrupt(event.at), "interrupt")
                     elif event.kind == "discard":
                         self.output("Very short/noisy utterance discarded.")
                         if self.interrupted_at is not None or (
@@ -238,9 +260,10 @@ class Session:
                             at=event.at,
                             threshold=self.effective_threshold,
                         )
-                    await engine.audio_event(event)
-                await engine.check()
+                    await self._bounded(engine.audio_event(event), "audio handling")
+                await self._bounded(engine.check(), "engine check")
         finally:
+            await self.watchdog.stop()
             try:
                 await engine.stop()
             finally:

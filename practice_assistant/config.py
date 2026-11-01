@@ -81,6 +81,10 @@ class Options:
     output_device: int | str | None = None
     live_model: str = "gpt-realtime-2.1"
     live_max_output_tokens: int = 2048
+    watchdog_seconds: float = 25.0
+    stt_model: str = "gpt-4o-transcribe"
+    chat_model: str = "gpt-4o-mini"
+    tts_model: str = "gpt-4o-mini-tts"
 
     def validate(self) -> None:
         if not 512 <= self.live_max_output_tokens <= 4096:
@@ -101,3 +105,8 @@ class Options:
             raise ValueError("Benchmark requires at least five successful turns.")
         if self.log_transcripts and self.log_dir is None:
             raise ValueError("--log-transcripts requires --log-dir (privacy opt-in).")
+        if not 5 <= self.watchdog_seconds <= 300:
+            raise ValueError("Watchdog timeout must be 5 to 300 seconds.")
+        for name in ("stt_model", "chat_model", "tts_model", "live_model"):
+            if not getattr(self, name).strip():
+                raise ValueError("Model names must not be empty.")

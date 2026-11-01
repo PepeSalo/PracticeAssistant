@@ -5,6 +5,7 @@ import asyncio
 import os
 import time
 import webbrowser
+from datetime import datetime
 from pathlib import Path
 
 from .cascade import CascadeEngine
@@ -32,6 +33,21 @@ CONTROL_ACTIONS = frozenset(
         "end",
     }
 )
+
+
+def default_log_dir() -> Path:
+    """Where session logs go when the user does not choose a directory.
+
+    A support log must exist by default: a user on another PC cannot diagnose a
+    freeze otherwise. Only events are stored (timestamps, states, durations);
+    spoken text needs the explicit --log-transcripts opt-in.
+    """
+    base = os.environ.get("LOCALAPPDATA") or os.environ.get("XDG_STATE_HOME")
+    if base:
+        root = Path(base) / "PracticeAssistant" / "logs"
+    else:
+        root = Path.home() / ".practice-assistant" / "logs"
+    return root / datetime.now().strftime("session-%Y%m%d-%H%M%S")
 
 
 def device(value: str) -> int | str:
@@ -70,7 +86,17 @@ def parser() -> argparse.ArgumentParser:
         default="headphones",
     )
     p.add_argument("--no-correction", action="store_true")
-    p.add_argument("--log-dir", type=Path)
+    p.add_argument(
+        "--log-dir",
+        type=Path,
+        help="Session log directory (default: the user's Practice Assistant "
+        "folder; events only, never spoken text).",
+    )
+    p.add_argument(
+        "--no-log",
+        action="store_true",
+        help="Do not write any session log.",
+    )
     p.add_argument(
         "--log-transcripts",
         action="store_true",
@@ -87,6 +113,15 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--ui", action="store_true", help="Open the local web chat window.")
     p.add_argument("--ui-port", type=int, default=8770)
     p.add_argument("--no-browser", action="store_true")
+    p.add_argument(
+        "--watchdog-seconds",
+        type=float,
+        default=25.0,
+        help="Cancel a turn that makes no progress for this many seconds.",
+    )
+    p.add_argument("--stt-model", default="gpt-4o-transcribe")
+    p.add_argument("--chat-model", default="gpt-4o-mini")
+    p.add_argument("--tts-model", default="gpt-4o-mini-tts")
     p.add_argument("--live-model", default="gpt-realtime-2.1")
     p.add_argument(
         "--live-max-output-tokens",
@@ -182,6 +217,8 @@ async def run(
         "Audio is sent to OpenAI; API usage charges apply. Use headphones. "
         "Press Ctrl+C to stop."
     )
+    if options.log_dir is not None:
+        print(f"Session log (events only, no speech): {options.log_dir}")
     if bus is not None:
         bus.describe(settings, options, options.engine)
         bus.emit("session", **settings_payload(settings))
@@ -216,6 +253,8 @@ async def run(
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        if args.log_dir is None and not args.no_log:
+            args.log_dir = default_log_dir()
         settings = Settings(
             args.practice_language,
             args.learner_language,
@@ -241,8 +280,21 @@ def main(argv: list[str] | None = None) -> int:
             output_device=args.output_device,
             live_model=args.live_model,
             live_max_output_tokens=args.live_max_output_tokens,
+            watchdog_seconds=args.watchdog_seconds,
+            stt_model=args.stt_model,
+            chat_model=args.chat_model,
+            tts_model=args.tts_model,
         )
         options.validate()
+        if options.log_dir is not None:
+            try:
+                options.log_dir.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                print(
+                    f"Warning: cannot write the log folder {options.log_dir}; "
+                    "continuing without a session log."
+                )
+                object.__setattr__(options, "log_dir", None)
         if not 1024 <= args.ui_port <= 65535:
             raise ValueError("UI port must be 1024 to 65535.")
         if args.list_devices:
@@ -272,6 +324,8 @@ def main(argv: list[str] | None = None) -> int:
             except RuntimeError as exc:
                 raise AppError(str(exc)) from exc
             print(f"Chat window: {url}")
+            if options.log_dir is not None:
+                print(f"Session log: {options.log_dir}")
             bus.emit(
                 "state",
                 state="starting",

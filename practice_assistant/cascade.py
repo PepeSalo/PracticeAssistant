@@ -310,6 +310,19 @@ class CascadeEngine:
         else:
             await self.check()
 
+    async def recover(self) -> None:
+        """Called by the watchdog: abandon a stuck turn, keep listening."""
+        s = self.session
+        if self.task is not None and not self.task.done():
+            self.task.cancel()
+            await asyncio.gather(self.task, return_exceptions=True)
+        self.task = None
+        s.playback.interrupt()
+        s.generating = False
+        if s.timing is not None and not s.timing.successful:
+            s.timing.interrupted = True
+        s.emit("state", state="listening", detail="Listening… speak again")
+
     def can_accept_text(self) -> bool:
         s = self.session
         return not s.generating and (self.task is None or self.task.done())

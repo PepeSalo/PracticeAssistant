@@ -1,6 +1,6 @@
 # Language Practice Assistant
 
-**Version: 1.4**
+**Version: 1.5**
 
 A speech-first Python application for practising languages with a conversational tutor.
 Speak naturally, receive short spoken replies, request gentle corrections and steer
@@ -16,6 +16,10 @@ automatic selection of the learner's explanation language.
 - Spoken controls for language, level, scenario, speaking rate, corrections and quitting.
 - Bounded audio buffers and conversation history, reconnect with recent context,
   friendly failures and optional cascade fallback.
+- Stall protection: every network/audio call is time-bounded, and a watchdog warns
+  you and cancels a stuck turn instead of freezing.
+- Session log written by default (events only, never speech) to help diagnose problems.
+- Configurable models for better multilingual accuracy.
 - Optional local **web chat window**: live state, what was heard, tutor replies,
   corrections, per-turn timings, session settings, quick controls and notifications.
 - Latency reports and opt-in event/transcript logging.
@@ -311,6 +315,12 @@ Use `.\Scripts\python.exe -m practice_assistant --help` for complete help.
 --output-device ID|NAME
 --live-model NAME               Default: gpt-realtime-2.1
 --live-max-output-tokens N       Default: 2048; audio + text budget, 512–4096
+--watchdog-seconds N            Default: 25; cancel a turn with no progress
+--stt-model NAME                Default: gpt-4o-transcribe
+--chat-model NAME               Default: gpt-4o-mini
+--tts-model NAME                Default: gpt-4o-mini-tts
+--log-dir PATH                  Session log folder (default: user folder)
+--no-log                        Write no session log
 --ui                            Open the local web chat window
 --ui-port N                     Default: 8770
 --no-browser                    Print the address without opening a browser
@@ -354,6 +364,83 @@ necessarily sum to the median total; streaming stages overlap.
 See [evaluation.md](docs/evaluation.md) for the seven-part protocol: latency,
 transcription errors, noise, interruption, echo, network failure and endpointing.
 Its real-results tables are deliberately **pending**, not filled with simulated numbers.
+
+
+## When nothing happens: stalls, the watchdog and logs
+
+Version 1.5 added two protection layers, because a stalled connection used to
+freeze the program with no message and no log.
+
+**1. Hard timeouts.** Every call that can reach the network or the audio device is
+bounded by `--timeout` (default 30 s). A stall now becomes a clear error and the
+session recovers, instead of blocking forever. In live mode the connection is
+re-established and the conversation resumes from recent context; in cascade mode
+only that turn fails.
+
+**2. Watchdog.** It runs as a separate task, so it still fires when the main loop
+is stuck inside an `await`. It watches for *progress* (a transcript, audio, a
+state change):
+
+| Elapsed without progress | What happens |
+|---|---|
+| `--watchdog-seconds / 3` (≈8 s) | "Still waiting for the assistant…" warning in the window and terminal |
+| `--watchdog-seconds` (default 25 s) | The turn is cancelled, an error explains what happened, and you can simply speak again |
+
+Idle listening is never treated as a stall. Set `--watchdog-seconds` to tune it.
+
+### Log files
+
+A session log is now written **by default**, so a problem on another PC can be
+diagnosed afterwards:
+
+```text
+%LOCALAPPDATA%\PracticeAssistant\logs\session-YYYYMMDD-HHMMSS\events.jsonl
+```
+
+Each line has a UTC timestamp, session ID and event (speech detected, turn
+failed, reconnect, watchdog timeout, calibration value…). **Spoken text is not
+stored** unless you also pass `--log-transcripts`. Use `--log-dir` to choose the
+folder, or `--no-log` to write nothing.
+
+The startup message prints the exact path. The installation log
+(`%TEMP%\practice-assistant-install.log`) is separate and only covers setup.
+
+### Understanding Finnish commands
+
+Direct commands work in English and Finnish, including the inflected forms
+learners actually say, and recognition is tolerant of missing ä/ö
+("ala korjaa" matches "älä korjaa"):
+
+`lopeta`, `seis`, `hetkinen`, `pysähdy`, `odota`, `rauhoitu` (stop) ·
+`toista`, `toista se`, `uudelleen`, `mitä sanoit` (repeat) ·
+`puhu hitaammin`, `hitaammin`, `nopeammin` (rate) ·
+`helpompaa`, `helpommin`, `vaikeampaa` (level) ·
+`korjaa virheeni`, `älä korjaa minua`, `älä korjaa virheitäni` (corrections) ·
+`harjoitellaan suomea`, `harjoitellaan espanjaa` (language) ·
+`skenaario kahvilassa`, `roolipeli …` (scenario) ·
+`lopeta harjoitus`, `näkemiin` (end)
+
+Quoted phrases such as "the bus stop" remain conversation. Recognition accuracy
+still depends on the speech model; see below.
+
+### Are the default models the best choice?
+
+| Stage | Default | Comment |
+|---|---|---|
+| Live speech-to-speech | `gpt-realtime-2.1` | Native audio, lowest latency. Its transcription of your input is what the app reads for commands. |
+| Transcription (cascade + live commands) | `gpt-4o-transcribe` | Changed from `gpt-4o-mini-transcribe` in 1.5: the mini model is cheaper but noticeably weaker on accented and non-English speech, which is the most likely cause of misunderstood Finnish commands. |
+| Chat | `gpt-4o-mini` | Fast and cheap; adequate for 1–3 sentence tutor replies. Use `--chat-model gpt-4o` for better correction quality at higher cost. |
+| Speech output | `gpt-4o-mini-tts` | Good quality and latency. |
+
+All four are configurable, so a slower but more accurate model is one flag away:
+
+```powershell
+.\venv\Scripts\python.exe -m practice_assistant --stt-model gpt-4o-transcribe `
+    --chat-model gpt-4o --watchdog-seconds 25
+```
+
+Model choice can cause misunderstanding, but it cannot cause a *freeze*: the
+freeze was the missing timeout above, which is now fixed.
 
 ## Reliability and limitations
 
@@ -472,6 +559,7 @@ These are development attributions, not runtime model dependencies.
 | 1.2 | 2026-10-13 | Optional automatic version updates from a GitHub repository (`install/update.ps1`, `Update Practice Assistant.cmd`, update check at startup), configurable repository URL, and documentation of the OpenRouter limitation. |
 | 1.3 | 2026-10-13 | Read-only GitHub token support for private repositories: optional one-time sign-in through Git Credential Manager, `PA_GITHUB_TOKEN` for automated setups, with the token never written to `update.ini`, `.git/config` or logs. OpenAI confirmed as the only provider. |
 | 1.4 | 2026-10-13 | Self-contained offline installation bundle (bundled Python installer and wheels, `-Offline`), with a network fallback; pip upgrade made best-effort so an install without internet cannot fail. Project moved to its own folder with a standard `.venv`. |
+| 1.5 | 2026-10-13 | Stall protection: bounded awaits in the listen loop and a watchdog that warns and cancels a stuck turn instead of freezing; session log written by default; more Finnish command forms with diacritic-tolerant matching; configurable STT/chat/TTS models with a more accurate default transcriber. |
 
 Start numbering at 1.0 and increase by exactly 0.1 for every subsequent completed
 code, configuration or documentation change set. Update this version, add a history

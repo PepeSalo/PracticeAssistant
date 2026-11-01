@@ -83,7 +83,7 @@ class OpenAIProvider:
         async def request() -> str:
             try:
                 response = await self.client.audio.transcriptions.create(
-                    model="gpt-4o-mini-transcribe",
+                    model=self.options.stt_model,
                     file=("utterance.wav", wav, "audio/wav"),
                 )
             except (APIConnectionError, APIStatusError) as exc:
@@ -113,7 +113,7 @@ class OpenAIProvider:
         async def open_stream():
             try:
                 return await self.client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model=self.options.chat_model,
                     messages=messages,
                     stream=True,
                     tools=chat_tools(),
@@ -188,7 +188,7 @@ class OpenAIProvider:
             carry = b""
             try:
                 async with self.client.audio.speech.with_streaming_response.create(
-                    model="gpt-4o-mini-tts",
+                    model=self.options.tts_model,
                     voice=self.options.voice,
                     input=text,
                     response_format="pcm",

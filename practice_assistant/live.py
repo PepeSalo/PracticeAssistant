@@ -56,6 +56,7 @@ class LiveEngine:
         self.input_id: str | None = None
         self.pending_commits: deque[int] = deque()
         self.pending_at: float | None = None
+        self.stalled: AppError | None = None
         self.goodbye_requested = False
         self.tool_steps = 0
 
@@ -168,7 +169,7 @@ class LiveEngine:
                 "audio": {
                     "input": {
                         "format": {"type": "audio/pcm", "rate": 24000},
-                        "transcription": {"model": "gpt-4o-mini-transcribe"},
+                        "transcription": {"model": s.options.stt_model},
                         "turn_detection": None,
                         "noise_reduction": {"type": "near_field"},
                     },
@@ -587,7 +588,24 @@ class LiveEngine:
                 for item_id in self.groups.popleft():
                     await self.connection.conversation.item.delete(item_id=item_id)
 
+    async def recover(self) -> None:
+        """Called by the watchdog: treat the stall as a lost connection."""
+        s = self.session
+        s.playback.interrupt()
+        if self.finisher is not None and not self.finisher.done():
+            self.finisher.cancel()
+            await asyncio.gather(self.finisher, return_exceptions=True)
+            self.finisher = None
+        # check() raises this on the next loop pass, so the normal reconnect
+        # path (bounded retries, context reseed) handles the failure.
+        self.stalled = AppError(
+            "Realtime stopped responding; reconnecting.", retryable=True
+        )
+
     async def check(self) -> None:
+        if self.stalled is not None:
+            error, self.stalled = self.stalled, None
+            raise error
         if self.receiver and self.receiver.done():
             await self.receiver
         if self.finisher and self.finisher.done():
