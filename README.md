@@ -481,19 +481,34 @@ freeze was the missing timeout above, which is now fixed.
 
 Audio is processed in memory and sent to OpenAI; recordings are not saved locally.
 Reports contain numeric timings and configuration, not transcripts or keys.
-Logs are disabled unless requested. `--log-dir` alone omits text;
-`--log-transcripts` explicitly enables input/completed-response text.
-Use a different log directory for each experiment; event logs append to `events.jsonl`.
+
+A session log is written **by default** since 1.5, so a problem on another PC can be
+diagnosed afterwards. It contains timestamps, session IDs, states, timings and errors -
+**not** the words you speak. It lives in
+`%LOCALAPPDATA%\PracticeAssistant\logs\session-*/events.jsonl`; the path is printed
+when the assistant starts.
+
+- `--log-dir PATH` chooses the folder.
+- `--no-log` writes no session log at all.
+- `--log-transcripts` additionally stores input and response text. This is the only
+  switch that puts speech in a file, and it is deliberately explicit.
+
+Use a different log directory for each experiment; events append to `events.jsonl`.
 
 ### Troubleshooting interrupted conversations
 
-No file log exists for a run started without `--log-dir`. Enable a diagnostic log
-without storing spoken text:
+Since 1.5 a session log exists by default, so nothing has to be enabled in advance:
 
 ```powershell
-.\Scripts\python.exe -m practice_assistant --practice-language en --learner-language sv --log-dir session-logs\diagnostic
-Get-Content .\session-logs\diagnostic\events.jsonl -Tail 30
+$logs = Join-Path $env:LOCALAPPDATA 'PracticeAssistant\logs'
+Get-ChildItem $logs | Sort-Object LastWriteTime -Descending | Select-Object -First 3
+Get-Content (Get-ChildItem $logs\session-*\events.jsonl |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1) -Tail 30
 ```
+
+The exact folder is printed at startup (`Session log (events only, no speech): ...`).
+To reproduce a problem with a dedicated log, add `--log-dir session-logs\diagnostic`
+as before, or use `--no-log` to write nothing.
 
 Each event includes a UTC timestamp and session ID. Response-end events record status,
 reason, error code and token budget; connection failures record the reason and whether
@@ -533,7 +548,7 @@ building version 1.1:
 - Black's Unicode banner fails to print in a legacy console code page, which can make a
   passing run look like a failure. `$env:PYTHONUTF8 = "1"` avoids that.
 
-Verified on Python 3.14.3: **211 offline tests passed**, Ruff/Black passed, source
+Verified on Python 3.14.3: **267 offline tests passed**, Ruff/Black passed, source
 compiled and dependency consistency passed. Tests fake SDK requests, streams,
 connections and devices, with an external-network guard. No actual API calls,
 microphone use or real latency measurements were made during implementation.

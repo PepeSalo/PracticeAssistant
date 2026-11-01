@@ -648,6 +648,48 @@ Phase A and Phase B shipped together as version 1.1 (one change set).
 9. README + `INSTALL.txt` + version history + `pyproject.toml` 1.1; `.gitignore` gets
    `dist/`.
 
+
+**Phase D — field fixes from the Windows 10 PC (version 1.5, done)**
+
+Reported on the target PC: Finnish commands were misunderstood, the program sometimes
+froze mid-conversation, and there was no log to diagnose either. Root causes found:
+
+1. **The freeze was an application bug, not a model problem.**
+   `Session.listen` awaited `engine.audio_event()` and `engine.interrupt()` with no
+   timeout, and `live.interrupt()` awaits `response.cancel()` and
+   `conversation.item.truncate()` over the WebSocket. A stalled socket therefore blocked
+   the listen loop indefinitely. The existing deadline in `check()` was only evaluated
+   *between* loop iterations, so it could never run again — a silent, permanent hang.
+2. **No diagnostic log existed by default.** `--log-dir` was opt-in and the installed
+   launcher never passed it, so nothing was recorded on the target PC.
+3. **The default transcriber was the weakest link for Finnish.**
+   `gpt-4o-mini-transcribe` feeds both command parsing and the cascade engine; the cheap
+   model is noticeably worse on accented and non-English speech. Model choice can cause
+   misunderstanding but cannot cause a freeze.
+
+Fixes:
+- `Session._bounded()` wraps every network/audio await in `asyncio.wait_for`, so a stall
+  becomes a recoverable `AppError` instead of a hang.
+- New `watchdog.py`: an independent asyncio task (it keeps running while the main loop is
+  blocked) warns after ~`--watchdog-seconds / 3` and cancels the stuck turn at
+  `--watchdog-seconds` (default 25). Idle listening is never treated as a stall.
+- `recover()` on both engines: live marks the socket failed and lets the existing bounded
+  reconnect reseed context; cascade cancels the turn and keeps listening.
+- Session logging is on by default (events only, never speech); `--no-log` disables it and
+  `--log-transcripts` remains the sole way to store text.
+- More Finnish command forms and diacritic-tolerant matching (STT often drops ä/ö);
+  exact matches always win, so folding never changes a clear phrase.
+- STT/chat/TTS/live models are configurable; the default transcriber is now
+  `gpt-4o-transcribe`.
+- A double-read bug found by the test suite: rejecting an already-consumed request body
+  drained it again and blocked until the client timed out. Fixed with two regression
+  tests.
+
+Honest limits: this was verified with offline tests and simulated stalls, not on the
+reported PC. Whether `gpt-4o-transcribe` is accurate enough for the learner's Finnish
+needs a real session; the new default log records what was actually heard, which
+separates recognition limits from command-parsing bugs.
+
 ## 25. Acceptance criteria for Part II
 
 - `python -m practice_assistant --ui` serves the chat window on `127.0.0.1`, opens the

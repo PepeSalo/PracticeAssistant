@@ -166,6 +166,7 @@ do not repeatedly issue costly calls just to provoke rate limits.
 | Failure | User message | Recovery time | Context resumed? | Duplicate speech? |
 |---|---|---|---|---|
 | Network disconnected / invalid key | Pending | Pending | Pending | Pending |
+| Connection stalls mid-turn (watchdog fires) | Pending (expect: "Still waiting…" then "no answer within N s") | Pending | Pending | Pending |
 
 Default: live reconnects up to the configured retry budget, reseeds bounded recent
 conversation, then exits with an error if exhausted. `--fallback-cascade` permits switching
@@ -174,8 +175,16 @@ errors do not trigger fallback. The interrupted turn is not replayed; repeat it 
 recovery. Cascade stage failures are printed and isolated to that turn.
 Do not expect an online TTS apology when the network/TTS service itself is unavailable.
 
-Enable `--log-dir session-logs\diagnostic` to retain timestamped response-status and
-connection-failure metadata without transcripts. `incomplete` with reason
+Since version 1.5 a session log is written by default to
+`%LOCALAPPDATA%\PracticeAssistant\logs\session-*/events.jsonl` (events only, no speech).
+Use it as the evidence for this table; add `--log-dir session-logs\diagnostic` for an
+experiment-specific folder, and `--log-transcripts` only if text is genuinely required.
+
+Watchdog check: with `--watchdog-seconds 25` (default) a stalled turn must produce a
+warning after roughly 8 s and a cancellation at 25 s, and the session must keep running
+afterwards. Confirm from the log that no turn silently disappears, and record whether the
+cancellation was appropriate (a genuinely slow answer versus a real stall). A too-low
+value cuts legitimate slow responses; a too-high value makes the user wait. `incomplete` with reason
 `max_output_tokens` or `content_filter` is a reply-level stop, not proof of network loss;
 the application remains connected and excludes the turn from benchmark success counts.
 Compare the logged live output budget (default 2048 audio/text tokens) with the reason.
