@@ -272,3 +272,21 @@ def test_stopping_the_server_releases_the_port(ui):
         replacement.start()
     finally:
         replacement.stop()
+
+
+def test_rejecting_a_consumed_body_does_not_hang(ui):
+    """Regression: draining an already-read body blocked until the client timed out."""
+    server, _bus, _controller, url = ui
+    # An empty JSON object is a valid body but an invalid command payload, so the
+    # handler fails after the body has been read.
+    status, body = post(f"{url}/api/command", {}, token=server.token)
+    assert status == 400
+    assert json.loads(body)["error"]
+    # A second request on a new connection must still work.
+    assert post(f"{url}/api/stop", {}, token=server.token)[0] == 200
+
+
+def test_body_cannot_be_read_twice(ui):
+    server, _bus, _controller, url = ui
+    for _ in range(3):
+        assert post(f"{url}/api/command", {"action": 5}, token=server.token)[0] == 400

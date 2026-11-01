@@ -56,6 +56,7 @@ class _Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     # Injected by WebUI.
+    body_consumed = False
     bus: Any
     controller: Controller
     token: str
@@ -86,7 +87,27 @@ class _Handler(BaseHTTPRequestHandler):
         self._send(status, body, "application/json; charset=utf-8")
 
     def _fail(self, status: int, message: str) -> None:
+        # Read any pending request body before closing; otherwise the client
+        # can see a connection reset instead of this response (Windows).
+        if self.command == "POST":
+            self._drain_body()
         self._json(status, {"error": message})
+
+    def _drain_body(self) -> None:
+        # The body may already be consumed by _body(); reading it twice blocks
+        # forever waiting for bytes that will never arrive.
+        if self.body_consumed:
+            return
+        self.body_consumed = True
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = 0
+        if 0 < length <= 10 * MAX_BODY:
+            try:
+                self.rfile.read(length)
+            except OSError:
+                pass
 
     def _host_ok(self) -> bool:
         return (self.headers.get("Host") or "").casefold() in self.allowed_hosts
@@ -105,14 +126,16 @@ class _Handler(BaseHTTPRequestHandler):
         return secrets.compare_digest(supplied, self.token)
 
     def _body(self) -> dict[str, Any] | None:
+        if self.body_consumed:
+            return None
+        self.body_consumed = True
         try:
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             return None
         if length <= 0 or length > MAX_BODY:
-            if 0 < length <= 10 * MAX_BODY:
-                # Drain what is already on the wire before answering.
-                self.rfile.read(length)
+            # Drain what is already on the wire before answering.
+            self._drain_body()
             return None
         raw = self.rfile.read(length)
         try:
