@@ -1,6 +1,6 @@
 # Language Practice Assistant
 
-**Version: 1.5**
+**Version: 1.6**
 
 A speech-first Python application for practising languages with a conversational tutor.
 Speak naturally, receive short spoken replies, request gentle corrections and steer
@@ -254,6 +254,11 @@ each time it starts. This is opt-in and never blocks starting the program.
   Git the check is skipped and the installed version keeps working.
 - `Update Practice Assistant.cmd` updates on demand. `PA_NO_UPDATE=1` skips the startup
   check once.
+- For a user who does not want to touch a terminal, the bundle also contains
+  **`Update Practice Assistant from GitHub.cmd`**. Copy that single file to the Desktop and
+  double-click it: it finds the installation, saves the repository address if it was
+  skipped at setup, pulls the newest version and prints a plain-language result. It never
+  touches the API key and leaves the installed version working if the update fails.
 
 The updater is deliberately conservative:
 
@@ -548,7 +553,7 @@ building version 1.1:
 - Black's Unicode banner fails to print in a legacy console code page, which can make a
   passing run look like a failure. `$env:PYTHONUTF8 = "1"` avoids that.
 
-Verified on Python 3.14.3: **267 offline tests passed**, Ruff/Black passed, source
+Verified on Python 3.14.3: **275 offline tests passed**, Ruff/Black passed, source
 compiled and dependency consistency passed. Tests fake SDK requests, streams,
 connections and devices, with an external-network guard. No actual API calls,
 microphone use or real latency measurements were made during implementation.
@@ -574,6 +579,7 @@ These are development attributions, not runtime model dependencies.
 | 1.2 | 2026-10-13 | Optional automatic version updates from a GitHub repository (`install/update.ps1`, `Update Practice Assistant.cmd`, update check at startup), configurable repository URL, and documentation of the OpenRouter limitation. |
 | 1.3 | 2026-10-13 | Read-only GitHub token support for private repositories: optional one-time sign-in through Git Credential Manager, `PA_GITHUB_TOKEN` for automated setups, with the token never written to `update.ini`, `.git/config` or logs. OpenAI confirmed as the only provider. |
 | 1.4 | 2026-10-13 | Self-contained offline installation bundle (bundled Python installer and wheels, `-Offline`), with a network fallback; pip upgrade made best-effort so an install without internet cannot fail. Project moved to its own folder with a standard `.venv`. |
+| 1.6 | 2026-10-13 | `Update Practice Assistant from GitHub.cmd`: a single double-clickable file for the Desktop that pulls the newest version, sets the repository address if it was skipped, and reports the outcome in plain language. |
 | 1.5 | 2026-10-13 | Stall protection: bounded awaits in the listen loop and a watchdog that warns and cancels a stuck turn instead of freezing; session log written by default; more Finnish command forms with diacritic-tolerant matching; configurable STT/chat/TTS models with a more accurate default transcriber. |
 
 Start numbering at 1.0 and increase by exactly 0.1 for every subsequent completed

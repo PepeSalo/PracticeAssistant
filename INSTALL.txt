@@ -105,6 +105,21 @@ To remove everything: delete the folder above and the
 "Practice Assistant" shortcuts from the Desktop and Start Menu.
 
 
+GETTING NEWER VERSIONS LATER
+----------------------------
+The USB stick also contains this single file:
+
+    Update Practice Assistant from GitHub.cmd
+
+Copy it to the Desktop and double-click it whenever you want the newest version.
+It finds the installed copy, downloads newer files from GitHub and says in plain
+words whether it worked. Your API key and settings are not changed.
+If there is no newer version, it simply says so.
+
+(The program also checks for updates when it starts. To skip that check once,
+set PA_NO_UPDATE=1 in a command prompt before starting it.)
+
+
 USING IT
 --------
 - Speak naturally. The assistant replies in short sentences.

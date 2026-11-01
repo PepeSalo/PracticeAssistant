@@ -16,6 +16,7 @@ CMD = ROOT / "Install.cmd"
 INSTRUCTIONS = ROOT / "INSTALL.txt"
 BUILD = ROOT / "scripts" / "build_usb_bundle.ps1"
 UPDATE = ROOT / "install" / "update.ps1"
+DESKTOP_UPDATE = ROOT / "Update Practice Assistant from GitHub.cmd"
 
 
 def read(path: Path) -> str:
@@ -24,7 +25,7 @@ def read(path: Path) -> str:
 
 
 def test_bundle_entry_points_exist():
-    for path in (INSTALL, CMD, INSTRUCTIONS, BUILD, UPDATE):
+    for path in (INSTALL, CMD, INSTRUCTIONS, BUILD, UPDATE, DESKTOP_UPDATE):
         assert path.is_file(), f"missing file: {path}"
 
 
@@ -104,7 +105,7 @@ def test_installer_never_echoes_the_key():
 
 def test_no_secret_or_author_path_leaks_into_the_scripts():
     secret = re.compile(r"sk-[A-Za-z0-9]{20,}")
-    for path in (INSTALL, CMD, INSTRUCTIONS, BUILD):
+    for path in (INSTALL, CMD, INSTRUCTIONS, BUILD, DESKTOP_UPDATE):
         text = read(path)
         assert not secret.search(text), f"possible key in {path}"
         assert "E:\\StudioCode" not in text, f"author path in {path}"
@@ -341,3 +342,54 @@ def test_build_script_refuses_offline_without_a_cache():
     text = read(BUILD)
     assert "Bundled Python installer not found" in text
     assert "Wheel cache not found" in text
+
+
+# ---- the desktop update file for non-technical users ------------------
+def test_desktop_update_file_is_a_double_clickable_cmd():
+    text = read(DESKTOP_UPDATE)
+    assert text.isascii(), "the .cmd must stay ASCII-only"
+    assert text.startswith("@echo off")
+    assert "pause" in text
+
+
+def test_desktop_update_uses_the_default_install_location():
+    text = read(DESKTOP_UPDATE)
+    assert r"%LOCALAPPDATA%\PracticeAssistant" in text
+
+
+def test_desktop_update_reuses_the_tested_updater():
+    text = read(DESKTOP_UPDATE)
+    assert r"install\update.ps1" in text
+    assert "-ExecutionPolicy Bypass" in text
+    assert "-NoProfile" in text
+
+
+def test_desktop_update_sets_the_repository_if_it_was_skipped():
+    text = read(DESKTOP_UPDATE)
+    assert "findstr" in text
+    assert "RepoUrl=" in text
+    assert "github.com/PepeSalo/PracticeAssistant" in text
+
+
+def test_desktop_update_guides_a_beginner_when_not_installed():
+    text = read(DESKTOP_UPDATE)
+    assert "is not installed on this PC yet" in text
+    assert "Install.cmd" in text
+    assert "USB" in text
+
+
+def test_desktop_update_never_hides_a_failure():
+    text = read(DESKTOP_UPDATE)
+    assert "did not finish" in text
+    assert "Your installed version still works" in text
+
+
+def test_desktop_update_does_not_touch_the_api_key():
+    text = read(DESKTOP_UPDATE)
+    assert "OPENAI_API_KEY" not in text
+    assert "setx" not in text.lower()
+
+
+def test_bundle_ships_the_desktop_update_file():
+    text = read(BUILD)
+    assert "Update Practice Assistant from GitHub.cmd" in text
